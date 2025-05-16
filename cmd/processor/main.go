@@ -108,5 +108,12 @@ if err != nil {
 	fmt.Printf("Error storing %s data: %v\n", dataType, err)
 	continue
 }
+_, err = sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+	QueueUrl:      aws.String(os.Getenv("SQS_QUEUE_URL")),
+	ReceiptHandle: aws.String(record.ReceiptHandle),
+})
+if err != nil {
+	fmt.Printf("Error deleting SQS message: %v\n", err)
+}
 
 }
