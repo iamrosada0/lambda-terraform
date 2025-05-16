@@ -55,5 +55,50 @@ for _, record := range event.Records {
 		fmt.Println("Missing device_id or timestamp")
 		continue
 	}
+item := map[string]types.AttributeValue{
+	"device_id": &types.AttributeValueMemberS{Value: data.DeviceID},
+	"timestamp": &types.AttributeValueMemberS{Value: data.Timestamp},
+	"type":      &types.AttributeValueMemberS{Value: dataType},
+}
+
+switch dataType {
+case "gyroscope":
+	if data.X == 0 && data.Y == 0 && data.Z == 0 {
+		fmt.Println("Invalid gyroscope data")
+		continue
+	}
+	item["x"], _ = attributevalue.Marshal(data.X)
+	item["y"], _ = attributevalue.Marshal(data.Y)
+	item["z"], _ = attributevalue.Marshal(data.Z)
+case "gps":
+	if data.Latitude == 0 && data.Longitude == 0 {
+		fmt.Println("Invalid GPS data")
+		continue
+	}
+	item["latitude"], _ = attributevalue.Marshal(data.Latitude)
+	item["longitude"], _ = attributevalue.Marshal(data.Longitude)
+case "photo":
+	if data.Image == "" {
+		fmt.Println("Invalid photo data")
+		continue
+	}
+	item["image"], _ = attributevalue.Marshal(data.Image)
+	imageBytes, err := base64.StdEncoding.DecodeString(data.Image)
+	if err != nil {
+		fmt.Printf("Error decoding photo: %v\n", err)
+		continue
+	}
+	// Placeholder Rekognition call
+	resp, err := rekognitionClient.CompareFaces(ctx, &rekognition.CompareFacesInput{
+		SourceImage:         &types.Image{Bytes: imageBytes},
+		TargetImage:         &types.Image{Bytes: imageBytes}, // Placeholder
+		SimilarityThreshold: aws.Float32(70),
+	})
+	isRecognized := err == nil && len(resp.FaceMatches) > 0
+	item["is_recognized"], _ = attributevalue.Marshal(isRecognized)
+default:
+	fmt.Println("Unknown data type")
+	continue
+}
 
 }
