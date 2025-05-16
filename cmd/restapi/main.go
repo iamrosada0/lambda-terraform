@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 )
 
 type TelemetryData struct {
@@ -84,5 +86,18 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 			})),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       fmt.Sprintf(`{"error": "Failed to load AWS config: %v"}`, err),
+		}, nil
+	}
 
+	item, err := attributevalue.MarshalMap(data)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       fmt.Sprintf(`{"error": "Failed to marshal data: %v"}`, err),
+		}, nil
+	}
 }
