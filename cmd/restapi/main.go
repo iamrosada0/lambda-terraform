@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -23,6 +24,14 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
 			Body:       `{"error": "Invalid data type. Use gyroscope, gps, or photo"}`,
+		}, nil
+	}
+
+	var data TelemetryData
+	if err := json.Unmarshal([]byte(event.Body), &data); err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error": "Invalid JSON format"}`,
 		}, nil
 	}
 }
