@@ -3,10 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/rekognition"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
 type TelemetryData struct {
@@ -33,4 +38,19 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to load AWS config: %v", err)
 	}
+
+	dynamoClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+	})
+	sqsClient := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
+		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+	})
+	rekClient := rekognition.NewFromConfig(cfg, func(o *rekognition.Options) {
+		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+	})
+	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+		o.UsePathStyle = true
+	})
+
 }
