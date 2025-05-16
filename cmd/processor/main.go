@@ -100,5 +100,13 @@ default:
 	fmt.Println("Unknown data type")
 	continue
 }
+_, err = dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+	TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
+	Item:      item,
+})
+if err != nil {
+	fmt.Printf("Error storing %s data: %v\n", dataType, err)
+	continue
+}
 
 }
