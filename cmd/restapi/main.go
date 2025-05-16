@@ -41,4 +41,36 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 			Body:       `{"error": "Missing device_id"}`,
 		}, nil
 	}
+
+	if data.Timestamp == "" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error": "Missing timestamp"}`,
+		}, nil
+	}
+
+	switch dataType {
+	case "gyroscope":
+		if data.X == 0 && data.Y == 0 && data.Z == 0 {
+			return events.APIGatewayProxyResponse{
+				StatusCode: 400,
+				Body:       `{"error": "Missing or invalid gyroscope data (x, y, z)"}`,
+			}, nil
+		}
+	case "gps":
+		if data.Latitude == 0 && data.Longitude == 0 {
+			return events.APIGatewayProxyResponse{
+				StatusCode: 400,
+				Body:       `{"error": "Missing or invalid GPS data (latitude, longitude)"}`,
+			}, nil
+		}
+	case "photo":
+		if data.Image == "" {
+			return events.APIGatewayProxyResponse{
+				StatusCode: 400,
+				Body:       `{"error": "Missing photo data (image)"}`,
+			}, nil
+		}
+	}
+
 }
