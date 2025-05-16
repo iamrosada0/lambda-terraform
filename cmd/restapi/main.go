@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -14,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+// TelemetryData represents the structure of incoming telemetry data
 type TelemetryData struct {
 	DeviceID  string  `json:"device_id"` // MAC address of the device
 	Timestamp string  `json:"timestamp"` // ISO 8601 timestamp
@@ -25,7 +27,9 @@ type TelemetryData struct {
 	Image     string  `json:"image,omitempty"` // Base64-encoded photo
 }
 
+// HandleRequest processes API Gateway POST requests for telemetry data
 func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	// Validate data type from path parameter
 	dataType := event.PathParameters["type"]
 	if dataType != "gyroscope" && dataType != "gps" && dataType != "photo" {
 		return events.APIGatewayProxyResponse{
@@ -34,6 +38,7 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		}, nil
 	}
 
+	// Parse request body
 	var data TelemetryData
 	if err := json.Unmarshal([]byte(event.Body), &data); err != nil {
 		return events.APIGatewayProxyResponse{
@@ -42,13 +47,13 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		}, nil
 	}
 
+	// Validate required fields
 	if data.DeviceID == "" {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
 			Body:       `{"error": "Missing device_id"}`,
 		}, nil
 	}
-
 	if data.Timestamp == "" {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
@@ -56,6 +61,7 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		}, nil
 	}
 
+	// Validate type-specific fields
 	switch dataType {
 	case "gyroscope":
 		if data.X == 0 && data.Y == 0 && data.Z == 0 {
@@ -80,12 +86,9 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		}
 	}
 
+	// Initialize AWS SDK for DynamoDB with service-specific endpoint
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion("us-west-2"),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				return aws.Endpoint{URL: os.Getenv("LOCALSTACK_ENDPOINT")}, nil
-			})),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
 	if err != nil {
@@ -95,6 +98,11 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		}, nil
 	}
 
+	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+	})
+
+	// Prepare DynamoDB item
 	item, err := attributevalue.MarshalMap(data)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
@@ -104,6 +112,7 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 	}
 	item["type"] = &types.AttributeValueMemberS{Value: dataType}
 
+	// Store in DynamoDB
 	_, err = client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
 		Item:      item,
@@ -115,6 +124,7 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 		}, nil
 	}
 
+	// Prepare response
 	responseBody := map[string]interface{}{
 		"message": fmt.Sprintf("%s data stored successfully", dataType),
 	}
@@ -130,5 +140,8 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 			"Content-Type": "application/json",
 		},
 	}, nil
+}
 
+func main() {
+	lambda.Start(HandleRequest)
 }
