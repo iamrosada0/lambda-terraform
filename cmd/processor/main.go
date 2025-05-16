@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 )
 
 type TelemetryData struct {
@@ -23,4 +26,11 @@ type SQSPayload struct {
 
 func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-west-2"),
+		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to load AWS config: %v", err)
+	}
 }
