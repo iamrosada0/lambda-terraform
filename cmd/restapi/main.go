@@ -18,4 +18,11 @@ type TelemetryData struct {
 }
 
 func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	dataType := event.PathParameters["type"]
+	if dataType != "gyroscope" && dataType != "gps" && dataType != "photo" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error": "Invalid data type. Use gyroscope, gps, or photo"}`,
+		}, nil
+	}
 }
