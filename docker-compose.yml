@@ -5,7 +5,7 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=sqs,lambda,apigateway,dynamodb,rekognition
+      - SERVICES=sqs,lambda,apigateway,dynamodb,rekognition,s3
   mosquitto:
     image: eclipse-mosquitto:2.0.18
     ports:
