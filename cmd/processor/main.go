@@ -1,5 +1,11 @@
 package main
 
+import (
+	"context"
+
+	"github.com/aws/aws-lambda-go/events"
+)
+
 type TelemetryData struct {
 	DeviceID  string  `json:"device_id"` // MAC address of the device
 	Timestamp string  `json:"timestamp"` // ISO 8601 timestamp
@@ -13,4 +19,8 @@ type TelemetryData struct {
 type SQSPayload struct {
 	Type string        `json:"type"`
 	Data TelemetryData `json:"data"`
+}
+
+func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
+
 }
