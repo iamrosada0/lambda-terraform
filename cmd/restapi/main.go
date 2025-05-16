@@ -34,4 +34,11 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 			Body:       `{"error": "Invalid JSON format"}`,
 		}, nil
 	}
+
+	if data.DeviceID == "" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       `{"error": "Missing device_id"}`,
+		}, nil
+	}
 }
