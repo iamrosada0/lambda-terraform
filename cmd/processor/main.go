@@ -10,3 +10,7 @@ type TelemetryData struct {
 	Longitude float64 `json:"longitude,omitempty"`
 	Image     string  `json:"image,omitempty"` // Base64-encoded photo
 }
+type SQSPayload struct {
+	Type string        `json:"type"`
+	Data TelemetryData `json:"data"`
+}
