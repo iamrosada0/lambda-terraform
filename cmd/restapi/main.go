@@ -114,4 +114,21 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 			Body:       fmt.Sprintf(`{"error": "Failed to store data: %v"}`, err),
 		}, nil
 	}
+
+	responseBody := map[string]interface{}{
+		"message": fmt.Sprintf("%s data stored successfully", dataType),
+	}
+	if dataType == "photo" {
+		responseBody["is_recognized"] = false // Placeholder for Rekognition
+	}
+	body, _ := json.Marshal(responseBody)
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: 200,
+		Body:       string(body),
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+	}, nil
+
 }
