@@ -7,15 +7,33 @@ terraform {
   }
 }
 
-variable "access_key" { 
-  type = string 
-  default = "dummy" 
-  }
-variable "secret_key" { type = string default = "dummy" }
-variable "region" { type = string default = "us-west-2" }
-variable "localstack_endpoint" { type = string default = "http://localhost:4566" }
-variable "sqs_queue_name" { type = string default = "fleet-telemetry-queue" }
-variable "dynamodb_table_name" { type = string default = "fleet-telemetry" }
+variable "access_key" {
+  type    = string
+  default = "dummy"
+}
+variable "secret_key" {
+  type    = string
+  default = "dummy"
+
+}
+variable "region" {
+  type    = string
+  default = "us-west-2"
+}
+variable "localstack_endpoint" {
+  type    = string
+  default = "http://localhost:4566"
+
+}
+variable "sqs_queue_name" {
+  type    = string
+  default = "fleet-telemetry-queue"
+}
+variable "dynamodb_table_name" {
+  type    = string
+  default = "fleet-telemetry"
+
+}
 
 provider "aws" {
   access_key                  = var.access_key
@@ -41,10 +59,10 @@ resource "aws_sqs_queue" "telemetry_queue" {
 
 # DynamoDB Table
 resource "aws_dynamodb_table" "telemetry_table" {
-  name           = var.dynamodb_table_name
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "device_id"
-  range_key      = "timestamp"
+  name         = var.dynamodb_table_name
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "device_id"
+  range_key    = "timestamp"
 
   attribute {
     name = "device_id"
@@ -62,8 +80,8 @@ resource "aws_iam_role" "lambda_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
@@ -71,8 +89,8 @@ resource "aws_iam_role" "lambda_role" {
 
 # IAM Policy for Lambda
 resource "aws_iam_role_policy" "lambda_policy" {
-  name   = "lambda_policy"
-  role   = aws_iam_role.lambda_role.id
+  name = "lambda_policy"
+  role = aws_iam_role.lambda_role.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
