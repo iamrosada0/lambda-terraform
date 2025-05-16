@@ -42,5 +42,18 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 	dynamoClient := dynamodb.NewFromConfig(cfg)
 	sqsClient := sqs.NewFromConfig(cfg)
 	rekognitionClient := rekognition.NewFromConfig(cfg)
+for _, record := range event.Records {
+	var payload SQSPayload
+	if err := json.Unmarshal([]byte(record.Body), &payload); err != nil {
+		fmt.Printf("Error unmarshaling SQS message: %v\n", err)
+		continue
+	}
+
+	data := payload.Data
+	dataType := payload.Type
+	if data.DeviceID == "" || data.Timestamp == "" {
+		fmt.Println("Missing device_id or timestamp")
+		continue
+	}
 
 }
