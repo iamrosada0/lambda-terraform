@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 )
 
 type TelemetryData struct {
@@ -72,5 +75,14 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 			}, nil
 		}
 	}
+
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-west-2"),
+		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{URL: os.Getenv("LOCALSTACK_ENDPOINT")}, nil
+			})),
+		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
+	)
 
 }
