@@ -1,69 +1,44 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-variable "access_key" {
-  type    = string
-  default = "dummy"
-}
-variable "secret_key" {
-  type    = string
-  default = "dummy"
-
-}
-variable "region" {
-  type    = string
-  default = "us-west-2"
-}
-variable "localstack_endpoint" {
-  type    = string
-  default = "http://localhost:4566"
-
-}
-variable "sqs_queue_name" {
-  type    = string
-  default = "fleet-telemetry-queue"
-}
-variable "dynamodb_table_name" {
-  type    = string
-  default = "fleet-telemetry"
-
-}
-
 provider "aws" {
+  region                      = var.region
   access_key                  = var.access_key
   secret_key                  = var.secret_key
-  region                      = var.region
   skip_credentials_validation = true
-  skip_metadata_api_check     = true
   skip_requesting_account_id  = true
+  skip_metadata_api_check     = true
   endpoints {
-    sqs         = var.localstack_endpoint
-    lambda      = var.localstack_endpoint
     apigateway  = var.localstack_endpoint
     dynamodb    = var.localstack_endpoint
+    lambda      = var.localstack_endpoint
+    sqs         = var.localstack_endpoint
+    s3          = var.s3_localstack_endpoint
     rekognition = var.localstack_endpoint
     iam         = var.localstack_endpoint
   }
 }
 
-# SQS Queue
+variable "access_key" {}
+variable "secret_key" {}
+variable "region" {}
+variable "localstack_endpoint" {}
+variable "s3_localstack_endpoint" {}
+variable "bucket_name" {}
+variable "sqs_queue_name" {}
+
+# Rest of your main.tf (SQS, DynamoDB, S3, Lambda, API Gateway resources)
+# Ensure resource names match TF_VAR_bucket_name and TF_VAR_sqs_queue_name
+resource "aws_s3_bucket" "photo_bucket" {
+  bucket = var.bucket_name
+}
+
 resource "aws_sqs_queue" "telemetry_queue" {
   name = var.sqs_queue_name
 }
 
-# DynamoDB Table
 resource "aws_dynamodb_table" "telemetry_table" {
-  name         = var.dynamodb_table_name
+  name         = "fleet-telemetry"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "device_id"
   range_key    = "timestamp"
-
   attribute {
     name = "device_id"
     type = "S"
@@ -74,25 +49,22 @@ resource "aws_dynamodb_table" "telemetry_table" {
   }
 }
 
-# IAM Role for Lambda
 resource "aws_iam_role" "lambda_role" {
-  name = "lambda_execution_role"
+  name = "lambda_role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
   })
 }
 
-# S3 Bucket
-resource "aws_s3_bucket" "photo_bucket" {
-  bucket = "telemetry-photos"
-}
-
-# Update IAM Policy
 resource "aws_iam_role_policy" "lambda_policy" {
   name = "lambda_policy"
   role = aws_iam_role.lambda_role.id
@@ -127,7 +99,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
     ]
   })
 }
-# Processor Lambda
+
 resource "aws_lambda_function" "processor_lambda" {
   filename         = "processor_lambda.zip"
   function_name    = "telemetry_processor"
@@ -137,7 +109,11 @@ resource "aws_lambda_function" "processor_lambda" {
   source_code_hash = filebase64sha256("processor_lambda.zip")
 }
 
-# REST API Lambda
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  event_source_arn = aws_sqs_queue.telemetry_queue.arn
+  function_name    = aws_lambda_function.processor_lambda.arn
+}
+
 resource "aws_lambda_function" "restapi_lambda" {
   filename         = "restapi_lambda.zip"
   function_name    = "telemetry_restapi"
@@ -147,7 +123,6 @@ resource "aws_lambda_function" "restapi_lambda" {
   source_code_hash = filebase64sha256("restapi_lambda.zip")
 }
 
-# API Gateway
 resource "aws_api_gateway_rest_api" "telemetry_api" {
   name = "telemetry-api"
 }
@@ -192,10 +167,4 @@ resource "aws_lambda_permission" "api_gateway_permission" {
   function_name = aws_lambda_function.restapi_lambda.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.telemetry_api.execution_arn}/*/*"
-}
-
-# SQS to Processor Lambda Mapping
-resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn = aws_sqs_queue.telemetry_queue.arn
-  function_name    = aws_lambda_function.processor_lambda.arn
 }
