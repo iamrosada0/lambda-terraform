@@ -43,7 +43,7 @@ type SQSPayload struct {
 func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 	// Initialize AWS SDK
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion("us-west-2"),
+		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
 	if err != nil {
@@ -67,6 +67,8 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 
 	// Process each SQS message
 	for _, record := range event.Records {
+		fmt.Printf("Recebendo mensagem ID: %s\n", record.MessageId)
+		fmt.Printf("Conteúdo da mensagem: %s\n", record.Body)
 		var payload SQSPayload
 		if err := json.Unmarshal([]byte(record.Body), &payload); err != nil {
 			fmt.Printf("Error unmarshaling SQS message: %v\n", err)
