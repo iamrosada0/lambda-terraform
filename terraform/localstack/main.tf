@@ -1,10 +1,59 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+variable "access_key" {
+  type    = string
+  default = "dummy"
+}
+variable "secret_key" {
+  type    = string
+  default = "dummy"
+}
+variable "region" {
+  type    = string
+  default = "us-west-2"
+}
+
+variable "bucket_name" {
+  type    = string
+  default = "my-test-bucket"
+}
+variable "sqs_queue_name" {
+  type    = string
+  default = "my-custom-sqs-queue"
+}
+variable "dynamodb_table" {
+  type    = string
+  default = "fleet-telemetry"
+}
+
+variable "localstack_endpoint" {
+  type    = string
+  default = "http://localhost:4566"
+}
+
+variable "s3_localstack_endpoint" {
+  type    = string
+  default = "http://s3.localhost.localstack.cloud:4566"
+}
+
+
 provider "aws" {
-  region                      = var.region
-  access_key                  = var.access_key
-  secret_key                  = var.secret_key
+  access_key = var.access_key
+  secret_key = var.secret_key
+  region     = var.region
+
+  s3_use_path_style           = true
   skip_credentials_validation = true
-  skip_requesting_account_id  = true
   skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+
   endpoints {
     apigateway  = var.localstack_endpoint
     dynamodb    = var.localstack_endpoint
@@ -16,13 +65,6 @@ provider "aws" {
   }
 }
 
-variable "access_key" {}
-variable "secret_key" {}
-variable "region" {}
-variable "localstack_endpoint" {}
-variable "s3_localstack_endpoint" {}
-variable "bucket_name" {}
-variable "sqs_queue_name" {}
 
 # Rest of your main.tf (SQS, DynamoDB, S3, Lambda, API Gateway resources)
 # Ensure resource names match TF_VAR_bucket_name and TF_VAR_sqs_queue_name
@@ -99,7 +141,6 @@ resource "aws_iam_role_policy" "lambda_policy" {
     ]
   })
 }
-
 resource "aws_lambda_function" "processor_lambda" {
   filename         = "processor_lambda.zip"
   function_name    = "telemetry_processor"
@@ -107,7 +148,24 @@ resource "aws_lambda_function" "processor_lambda" {
   handler          = "main"
   runtime          = "go1.x"
   source_code_hash = filebase64sha256("processor_lambda.zip")
+  timeout          = 120
+  memory_size      = 512
+
+  environment {
+    variables = {
+      AWS_DEFAULT_REGION                 = var.region
+      LOCALSTACK_ENDPOINT                = var.localstack_endpoint
+      S3_ENDPOINT                        = var.s3_localstack_endpoint
+      S3_BUCKET                          = var.bucket_name
+      DYNAMODB_TABLE                     = var.dynamodb_table
+      SQS_QUEUE_URL                      = var.localstack_endpoint
+      LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT = "120"
+    }
+  }
 }
+
+
+
 
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   event_source_arn = aws_sqs_queue.telemetry_queue.arn
@@ -121,6 +179,17 @@ resource "aws_lambda_function" "restapi_lambda" {
   handler          = "main"
   runtime          = "go1.x"
   source_code_hash = filebase64sha256("restapi_lambda.zip")
+
+  environment {
+    variables = {
+      AWS_DEFAULT_REGION  = var.region
+      LOCALSTACK_ENDPOINT = var.localstack_endpoint
+      S3_ENDPOINT         = var.s3_localstack_endpoint
+      S3_BUCKET           = var.bucket_name
+      DYNAMODB_TABLE      = var.dynamodb_table
+      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.id
+    }
+  }
 }
 
 resource "aws_api_gateway_rest_api" "telemetry_api" {
