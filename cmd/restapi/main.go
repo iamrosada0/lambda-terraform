@@ -88,7 +88,7 @@ func HandleRequest(ctx context.Context, event events.APIGatewayProxyRequest) (ev
 
 	// Initialize AWS SDK for DynamoDB with service-specific endpoint
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion("us-west-2"),
+		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
 	if err != nil {
