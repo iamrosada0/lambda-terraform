@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -51,7 +53,7 @@ func main() {
 		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
 	})
 
-		if token := client.Subscribe("sensor/#", 0, func(c mqtt.Client, msg mqtt.Message) {
+	if token := client.Subscribe("sensor/#", 0, func(c mqtt.Client, msg mqtt.Message) {
 		var data Payload
 		if err := json.Unmarshal(msg.Payload(), &data.Data); err != nil {
 			fmt.Printf("Error deserializing MQTT message: %v\n", err)
@@ -74,5 +76,11 @@ func main() {
 			return
 		}
 		fmt.Printf("Sent %s to SQS\n", data.Type)
-	});
+	}); token.Wait() && token.Error() != nil {
+		fmt.Printf("Error subscribing to MQTT topic: %v\n", token.Error())
+		os.Exit(1)
+	}
+
+	fmt.Println("Listening to MQTT messages on topic sensor/#...")
+	select {} // Keep the program running
 }
