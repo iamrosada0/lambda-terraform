@@ -50,4 +50,29 @@ func main() {
 	sqsClient := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
 		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
 	})
+
+		if token := client.Subscribe("sensor/#", 0, func(c mqtt.Client, msg mqtt.Message) {
+		var data Payload
+		if err := json.Unmarshal(msg.Payload(), &data.Data); err != nil {
+			fmt.Printf("Error deserializing MQTT message: %v\n", err)
+			return
+		}
+		data.Type = strings.TrimPrefix(msg.Topic(), "sensor/")
+		body, err := json.Marshal(data)
+		if err != nil {
+			fmt.Printf("Error serializing payload for SQS: %v\n", err)
+			return
+		}
+
+		// Send to SQS
+		_, err = sqsClient.SendMessage(context.Background(), &sqs.SendMessageInput{
+			QueueUrl:    aws.String(os.Getenv("SQS_QUEUE_URL")),
+			MessageBody: aws.String(string(body)),
+		})
+		if err != nil {
+			fmt.Printf("Error sending to SQS: %v\n", err)
+			return
+		}
+		fmt.Printf("Sent %s to SQS\n", data.Type)
+	});
 }
