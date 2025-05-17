@@ -1,19 +1,27 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition"
+	rekoTypes "github.com/aws/aws-sdk-go-v2/service/rekognition/types" // Correct import for Image
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
+// TelemetryData represents the structure of incoming telemetry data
 type TelemetryData struct {
 	DeviceID  string  `json:"device_id"` // MAC address of the device
 	Timestamp string  `json:"timestamp"` // ISO 8601 timestamp
@@ -24,13 +32,16 @@ type TelemetryData struct {
 	Longitude float64 `json:"longitude,omitempty"`
 	Image     string  `json:"image,omitempty"` // Base64-encoded photo
 }
+
+// SQSPayload represents the SQS message structure
 type SQSPayload struct {
 	Type string        `json:"type"`
 	Data TelemetryData `json:"data"`
 }
 
+// HandleRequest processes SQS messages containing telemetry data
 func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
-
+	// Initialize AWS SDK
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion("us-west-2"),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
@@ -39,6 +50,7 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 		return "", fmt.Errorf("failed to load AWS config: %v", err)
 	}
 
+	// Service clients with LocalStack endpoints
 	dynamoClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
 	})
@@ -53,8 +65,8 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 		o.UsePathStyle = true
 	})
 
-
-for _, record := range event.Records {
+	// Process each SQS message
+	for _, record := range event.Records {
 		var payload SQSPayload
 		if err := json.Unmarshal([]byte(record.Body), &payload); err != nil {
 			fmt.Printf("Error unmarshaling SQS message: %v\n", err)
@@ -119,8 +131,8 @@ for _, record := range event.Records {
 
 			// Placeholder Rekognition call
 			resp, err := rekClient.CompareFaces(ctx, &rekognition.CompareFacesInput{
-				SourceImage:         &rekoTypes.Image{Bytes: imageBytes}, 
-				TargetImage:         &rekoTypes.Image{Bytes: imageBytes}, 
+				SourceImage:         &rekoTypes.Image{Bytes: imageBytes},
+				TargetImage:         &rekoTypes.Image{Bytes: imageBytes}, // Placeholder: replace with stored photo
 				SimilarityThreshold: aws.Float32(70),
 			})
 			isRecognized := err == nil && len(resp.FaceMatches) > 0
@@ -131,7 +143,7 @@ for _, record := range event.Records {
 			continue
 		}
 
-		
+		// Store in DynamoDB
 		_, err = dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 			TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
 			Item:      item,
@@ -141,7 +153,7 @@ for _, record := range event.Records {
 			continue
 		}
 
-	
+		// Delete SQS message
 		_, err = sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 			QueueUrl:      aws.String(os.Getenv("SQS_QUEUE_URL")),
 			ReceiptHandle: aws.String(record.ReceiptHandle),
@@ -149,4 +161,11 @@ for _, record := range event.Records {
 		if err != nil {
 			fmt.Printf("Error deleting SQS message: %v\n", err)
 		}
+	}
+
+	return "Processed successfully", nil
+}
+
+func main() {
+	lambda.Start(HandleRequest)
 }
