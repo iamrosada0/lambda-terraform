@@ -1,0 +1,34 @@
+# Ignorar diretórios e arquivos do Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+crash.log
+*.log
+.terraform.lock.hcl
+
+# Ignorar arquivos do Go
+bin/
+vendor/
+*.exe
+*.test
+*.out
+
+# Ignorar arquivos temporários de IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignorar arquivos de configuração locais
+.env
+.envrc
+*.local
+
+# Docker
+**/.volume/
+
+# Outros
+node_modules/

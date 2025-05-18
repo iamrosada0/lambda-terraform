@@ -17,7 +17,7 @@ variable "secret_key" {
 }
 variable "region" {
   type    = string
-  default = "us-west-2"
+  default = "us-east-2"
 }
 
 variable "bucket_name" {
@@ -26,7 +26,7 @@ variable "bucket_name" {
 }
 variable "sqs_queue_name" {
   type    = string
-  default = "minha-fila"
+  default = "minha-fila" # Corrigido o typo
 }
 variable "dynamodb_table" {
   type    = string
@@ -42,7 +42,6 @@ variable "s3_localstack_endpoint" {
   type    = string
   default = "http://s3.localhost.localstack.cloud:4566"
 }
-
 
 provider "aws" {
   access_key = var.access_key
@@ -65,9 +64,6 @@ provider "aws" {
   }
 }
 
-
-# Rest of your main.tf (SQS, DynamoDB, S3, Lambda, API Gateway resources)
-# Ensure resource names match TF_VAR_bucket_name and TF_VAR_sqs_queue_name
 resource "aws_s3_bucket" "photo_bucket" {
   bucket = var.bucket_name
 }
@@ -107,116 +103,6 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda_policy"
-  role = aws_iam_role.lambda_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes",
-          "sqs:GetQueueUrl"
-        ]
-        Resource = aws_sqs_queue.telemetry_queue.arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:PutItem",
-          "dynamodb:Query",
-          "dynamodb:GetItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:Scan"
-        ]
-        Resource = aws_dynamodb_table.telemetry_table.arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.photo_bucket.arn,
-          "${aws_s3_bucket.photo_bucket.arn}/*"
-        ]
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["rekognition:CompareFaces"]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-resource "aws_lambda_function" "processor_lambda" {
-  filename         = "${path.module}/processor.zip"
-  function_name    = "telemetry_processor"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "bootstrap"
-  runtime          = "provided.al2" # Updated to supported runtime
-  source_code_hash = filebase64sha256("${path.module}/processor.zip")
-  timeout          = 120
-  memory_size      = 512
-
-  environment {
-    variables = {
-      AWS_DEFAULT_REGION  = var.region
-      LOCALSTACK_ENDPOINT = "http://localstack:4566" # Explicitly set to match Docker network
-      S3_ENDPOINT         = var.s3_localstack_endpoint
-      S3_BUCKET           = var.bucket_name
-      DYNAMODB_TABLE      = var.dynamodb_table
-      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.url
-      # Remove redundant LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT, as it's set in docker-compose.yml
-    }
-  }
-}
-
-# Add event source mapping for SQS
-resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn = aws_sqs_queue.telemetry_queue.arn
-  function_name    = aws_lambda_function.processor_lambda.arn
-  batch_size       = 1 # Process one message at a time for simplicity
-  enabled          = true
-}
-
-
-resource "aws_lambda_function" "restapi_lambda" {
-  filename         = "${path.module}/restapi.zip"
-  function_name    = "telemetry_restapi"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "bootstrap"    # handler sempre "bootstrap"
-  runtime          = "provided.al2" # custom runtime
-  source_code_hash = filebase64sha256("${path.module}/restapi.zip")
-
-  environment {
-    variables = {
-      AWS_DEFAULT_REGION  = var.region
-      LOCALSTACK_ENDPOINT = "http://localstack:4566" # Explicitly set to match Docker network
-      S3_ENDPOINT         = var.s3_localstack_endpoint
-      S3_BUCKET           = var.bucket_name
-      DYNAMODB_TABLE      = var.dynamodb_table
-      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.url
-    }
-  }
-}
-
-
 resource "aws_api_gateway_rest_api" "telemetry_api" {
   name = "telemetry-api"
 }
@@ -246,19 +132,11 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   http_method             = aws_api_gateway_method.post_method.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.restapi_lambda.invoke_arn
+  uri                     = "arn:aws:apigateway:us-east-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-2:000000000000:function:telemetry_restapi/invocations"
 }
 
 resource "aws_api_gateway_deployment" "deployment" {
   rest_api_id = aws_api_gateway_rest_api.telemetry_api.id
   depends_on  = [aws_api_gateway_integration.lambda_integration]
   stage_name  = "prod"
-}
-
-resource "aws_lambda_permission" "api_gateway_permission" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.restapi_lambda.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.telemetry_api.execution_arn}/*/*"
 }

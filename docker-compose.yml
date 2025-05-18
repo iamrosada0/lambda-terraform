@@ -27,6 +27,13 @@ services:
       - LAMBDA_EXECUTOR=docker-reuse
       - DEBUG=1  # Enable detailed logging
       - DOCKER_HOST=unix:///var/run/docker.sock
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=300
+      - AWS_DEFAULT_REGION=us-east-2
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - S3_BUCKET=my-test-bucket
+      - DYNAMODB_TABLE=fleet-telemetry
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/minha-fila
+
 
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
