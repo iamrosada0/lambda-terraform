@@ -114,19 +114,38 @@ resource "aws_iam_role_policy" "lambda_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+          "sqs:GetQueueUrl"
+        ]
         Resource = aws_sqs_queue.telemetry_queue.arn
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:PutItem", "dynamodb:Query"]
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Scan"
+        ]
         Resource = aws_dynamodb_table.telemetry_table.arn
       },
       {
-        Effect   = "Allow"
-        Action   = ["s3:PutObject", "s3:GetObject"]
-        Resource = "${aws_s3_bucket.photo_bucket.arn}/*"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.photo_bucket.arn,
+          "${aws_s3_bucket.photo_bucket.arn}/*"
+        ]
       },
       {
         Effect   = "Allow"
@@ -134,8 +153,12 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Resource = "*"
       },
       {
-        Effect   = "Allow"
-        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
         Resource = "*"
       }
     ]
@@ -146,31 +169,40 @@ resource "aws_lambda_function" "processor_lambda" {
   function_name    = "telemetry_processor"
   role             = aws_iam_role.lambda_role.arn
   handler          = "main"
-  runtime          = "go1.x"
+  runtime          = "provided.al2" # Updated to supported runtime
   source_code_hash = filebase64sha256("processor_lambda.zip")
   timeout          = 120
   memory_size      = 512
 
   environment {
     variables = {
-      AWS_DEFAULT_REGION                 = var.region
-      LOCALSTACK_ENDPOINT                = var.localstack_endpoint
-      S3_ENDPOINT                        = var.s3_localstack_endpoint
-      S3_BUCKET                          = var.bucket_name
-      DYNAMODB_TABLE                     = var.dynamodb_table
-      SQS_QUEUE_URL                      = var.localstack_endpoint
-      LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT = "120"
+      AWS_DEFAULT_REGION  = var.region
+      LOCALSTACK_ENDPOINT = "http://localstack:4566" # Explicitly set to match Docker network
+      S3_ENDPOINT         = var.s3_localstack_endpoint
+      S3_BUCKET           = var.bucket_name
+      DYNAMODB_TABLE      = var.dynamodb_table
+      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.url
+      # Remove redundant LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT, as it's set in docker-compose.yml
     }
   }
 }
 
-
-
-
+# Add event source mapping for SQS
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
   event_source_arn = aws_sqs_queue.telemetry_queue.arn
   function_name    = aws_lambda_function.processor_lambda.arn
+  batch_size       = 1 # Process one message at a time for simplicity
+  enabled          = true
 }
+
+
+
+
+
+# resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+#   event_source_arn = aws_sqs_queue.telemetry_queue.arn
+#   function_name    = aws_lambda_function.processor_lambda.arn
+# }
 
 resource "aws_lambda_function" "restapi_lambda" {
   filename         = "restapi_lambda.zip"
@@ -187,10 +219,11 @@ resource "aws_lambda_function" "restapi_lambda" {
       S3_ENDPOINT         = var.s3_localstack_endpoint
       S3_BUCKET           = var.bucket_name
       DYNAMODB_TABLE      = var.dynamodb_table
-      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.id
+      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.url # corrigido aqui
     }
   }
 }
+
 
 resource "aws_api_gateway_rest_api" "telemetry_api" {
   name = "telemetry-api"
