@@ -13,10 +13,10 @@ RESTAPI_LAMBDA_NAME="restapi-func"
 echo "1. Build e zip das funções via docker-compose..."
 
 docker-compose run --rm builder-processor
-mv cmd/processor/function.zip processor.zip
+mv cmd/processor/function.zip terraform/localstack/processor.zip
 
 docker-compose run --rm builder-restapi
-mv cmd/restapi/function.zip restapi.zip
+mv cmd/restapi/function.zip terraform/localstack/restapi.zip
 
 echo "2. Subindo LocalStack..."
 docker-compose up -d localstack
