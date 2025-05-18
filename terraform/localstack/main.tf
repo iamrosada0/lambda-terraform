@@ -26,7 +26,7 @@ variable "bucket_name" {
 }
 variable "sqs_queue_name" {
   type    = string
-  default = "my-custom-sqs-queue"
+  default = "minha-fila"
 }
 variable "dynamodb_table" {
   type    = string
@@ -165,12 +165,12 @@ resource "aws_iam_role_policy" "lambda_policy" {
   })
 }
 resource "aws_lambda_function" "processor_lambda" {
-  filename         = "processor_lambda.zip"
+  filename         = "${path.module}/processor.zip"
   function_name    = "telemetry_processor"
   role             = aws_iam_role.lambda_role.arn
-  handler          = "main"
+  handler          = "bootstrap"
   runtime          = "provided.al2" # Updated to supported runtime
-  source_code_hash = filebase64sha256("processor_lambda.zip")
+  source_code_hash = filebase64sha256("${path.module}/processor.zip")
   timeout          = 120
   memory_size      = 512
 
@@ -196,30 +196,22 @@ resource "aws_lambda_event_source_mapping" "sqs_trigger" {
 }
 
 
-
-
-
-# resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-#   event_source_arn = aws_sqs_queue.telemetry_queue.arn
-#   function_name    = aws_lambda_function.processor_lambda.arn
-# }
-
 resource "aws_lambda_function" "restapi_lambda" {
-  filename         = "restapi_lambda.zip"
+  filename         = "${path.module}/restapi.zip"
   function_name    = "telemetry_restapi"
   role             = aws_iam_role.lambda_role.arn
-  handler          = "main"
-  runtime          = "go1.x"
-  source_code_hash = filebase64sha256("restapi_lambda.zip")
+  handler          = "bootstrap"    # handler sempre "bootstrap"
+  runtime          = "provided.al2" # custom runtime
+  source_code_hash = filebase64sha256("${path.module}/restapi.zip")
 
   environment {
     variables = {
       AWS_DEFAULT_REGION  = var.region
-      LOCALSTACK_ENDPOINT = var.localstack_endpoint
+      LOCALSTACK_ENDPOINT = "http://localstack:4566" # Explicitly set to match Docker network
       S3_ENDPOINT         = var.s3_localstack_endpoint
       S3_BUCKET           = var.bucket_name
       DYNAMODB_TABLE      = var.dynamodb_table
-      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.url # corrigido aqui
+      SQS_QUEUE_URL       = aws_sqs_queue.telemetry_queue.url
     }
   }
 }
