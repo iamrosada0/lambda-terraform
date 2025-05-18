@@ -1,15 +1,50 @@
 version: "3.8"
 services:
+
+  builder-processor:
+    build: .
+    volumes:
+      - ./:/src
+    working_dir: /src/cmd/processor
+    command: bash -c "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go && zip function.zip bootstrap"
+
+  builder-restapi:
+    build: .
+    volumes:
+      - ./:/src
+    working_dir: /src/cmd/restapi
+    command: bash -c "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go && zip function.zip bootstrap"
+
   localstack:
     image: localstack/localstack:3.8.1
     ports:
       - "4566:4566"
+      - "4510-4559:4510-4559"
     environment:
-      - SERVICES=sqs,lambda,apigateway,dynamodb,rekognition,s3,iam
+      - SERVICES=sqs,lambda,apigateway,dynamodb,rekognition,s3,iam,logs
       - DEFAULT_REGION=us-west-2
+      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=120
+      - DEBUG=1  # Enable detailed logging
+      - LAMBDA_DOCKER_NETWORK=fleet-telemetry_default  # Ensure Lambda uses the same network
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - fleet-telemetry_default
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2g"
+
   mosquitto:
     image: eclipse-mosquitto:2.0.18
     ports:
       - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+    networks:
+      - fleet-telemetry_default
+
+networks:
+  fleet-telemetry_default:
+    driver: bridge
