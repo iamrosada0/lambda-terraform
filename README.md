@@ -2,6 +2,9 @@
 
 # FleetPulse
 
+![image](https://github.com/user-attachments/assets/0e6bb25a-2491-45d5-9744-cff357ee8de2)
+
+
 **FleetPulse** é um sistema de telemetria para dispositivos IoT (como rastreadores veiculares), que processa dados de sensores como GPS, giroscópio e imagens. Ele utiliza serviços da AWS simulados com **LocalStack**, permitindo desenvolvimento e testes locais com serviços como **Lambda**, **SQS**, **S3**, **DynamoDB**, **Rekognition** e **Mosquitto** para MQTT.
 
 > Desenvolvido em Go, com infraestrutura gerenciada via **Terraform** e **Serverless Framework**, este projeto é ideal para protótipos e simulações de sistemas de frotas inteligentes.
