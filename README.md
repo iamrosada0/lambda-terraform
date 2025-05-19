@@ -154,6 +154,8 @@ aws --endpoint-url=http://localhost:4566 s3 ls s3://my-test-bucket
 
 Para testar o fluxo de publicação MQTT e envio para a SQS, siga os passos abaixo:
 
+Deves rodar o arquivo no folder ``mqtt_to_sqs``
+
 ### 🔹 Publicar uma mensagem no tópico `sensor/gps`
 
 Execute o seguinte comando para simular uma mensagem de GPS:
