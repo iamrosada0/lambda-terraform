@@ -5,13 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+)
+
+// Environment constants with default values
+const (
+	defaultLocalstackEndpoint = "http://localhost:4566"
+	defaultSQSQueueName       = "minha-fila"
+	defaultSQSQueueURL        = defaultLocalstackEndpoint + "/000000000000/" + defaultSQSQueueName
+	defaultS3TestBucket       = "my-test-bucket"
+	defaultS3LambdaBucket     = "my-lambda-bucket"
+	defaultDynamoDBTable      = "fleet-telemetry"
+	defaultLambdaFunctionName = "minha-funcao"
+	defaultZipFile            = "fleet-pulse.zip"
+	defaultRegion             = "us-east-1"
 )
 
 // TelemetryData represents the structure of incoming telemetry data
@@ -33,17 +48,32 @@ type SQSPayload struct {
 }
 
 func main() {
-	// Validate environment variables
-	endpoint := os.Getenv("LOCALSTACK_ENDPOINT")
-	queueURL := os.Getenv("SQS_QUEUE_URL")
-	region := os.Getenv("AWS_DEFAULT_REGION")
-	if endpoint == "" || queueURL == "" || region == "" {
+	// Load environment variables with defaults
+	localstackEndpoint := getEnv("LOCALSTACK_ENDPOINT", defaultLocalstackEndpoint)
+	sqsQueueName := getEnv("SQS_QUEUE_NAME", defaultSQSQueueName)
+	sqsQueueURL := getEnv("SQS_QUEUE_URL", defaultLocalstackEndpoint+"/000000000000/"+sqsQueueName)
+	s3TestBucket := getEnv("S3_TEST_BUCKET", defaultS3TestBucket)
+	s3LambdaBucket := getEnv("S3_LAMBDA_BUCKET", defaultS3LambdaBucket)
+	dynamoDBTable := getEnv("DYNAMODB_TABLE", defaultDynamoDBTable)
+	lambdaFunctionName := getEnv("LAMBDA_FUNCTION_NAME", defaultLambdaFunctionName)
+	zipFile := getEnv("ZIP_FILE", defaultZipFile)
+	region := getEnv("AWS_DEFAULT_REGION", defaultRegion)
+
+	// Validate critical environment variables
+	if localstackEndpoint == "" || sqsQueueURL == "" || region == "" {
 		fmt.Println("Erro: LOCALSTACK_ENDPOINT, SQS_QUEUE_URL, ou AWS_DEFAULT_REGION não definidos")
 		os.Exit(1)
 	}
-	fmt.Printf("Usando LOCALSTACK_ENDPOINT: %s\n", endpoint)
-	fmt.Printf("Usando SQS_QUEUE_URL: %s\n", queueURL)
-	fmt.Printf("Usando AWS_DEFAULT_REGION: %s\n", region)
+	fmt.Printf("Configuração:\n")
+	fmt.Printf("  LOCALSTACK_ENDPOINT: %s\n", localstackEndpoint)
+	fmt.Printf("  SQS_QUEUE_URL: %s\n", sqsQueueURL)
+	fmt.Printf("  AWS_DEFAULT_REGION: %s\n", region)
+	fmt.Printf("  SQS_QUEUE_NAME: %s\n", sqsQueueName)
+	fmt.Printf("  S3_TEST_BUCKET: %s\n", s3TestBucket)
+	fmt.Printf("  S3_LAMBDA_BUCKET: %s\n", s3LambdaBucket)
+	fmt.Printf("  DYNAMODB_TABLE: %s\n", dynamoDBTable)
+	fmt.Printf("  LAMBDA_FUNCTION_NAME: %s\n", lambdaFunctionName)
+	fmt.Printf("  ZIP_FILE: %s\n", zipFile)
 
 	// Configurar cliente SQS
 	cfg, err := config.LoadDefaultConfig(context.Background(),
@@ -55,7 +85,7 @@ func main() {
 		os.Exit(1)
 	}
 	sqsClient := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
-		o.BaseEndpoint = aws.String(endpoint)
+		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 	fmt.Println("Cliente SQS configurado com sucesso")
 
@@ -71,6 +101,12 @@ func main() {
 		// Validate required fields
 		if telemetry.DeviceID == "" || telemetry.Timestamp == "" {
 			fmt.Println("Erro: device_id ou timestamp ausentes")
+			return
+		}
+
+		// Validate timestamp format
+		if _, err := time.Parse(time.RFC3339, telemetry.Timestamp); err != nil {
+			fmt.Printf("Erro: timestamp inválido: %s\n", telemetry.Timestamp)
 			return
 		}
 
@@ -108,15 +144,19 @@ func main() {
 			return
 		}
 		fmt.Printf("Enviando para SQS: %s\n", string(body))
-		result, err := sqsClient.SendMessage(context.Background(), &sqs.SendMessageInput{
-			QueueUrl:    aws.String(queueURL),
+
+		// Send to SQS with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		result, err := sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+			QueueUrl:    aws.String(sqsQueueURL),
 			MessageBody: aws.String(string(body)),
 		})
 		if err != nil {
 			fmt.Printf("Erro ao enviar para SQS: %v\n", err)
 			return
 		}
-		fmt.Printf("Mensagem %s enviada para SQS com MessageId: %s\n", dataType, *result.MessageId)
+		fmt.Printf("Mensagem %s do dispositivo %s enviada para SQS com MessageId: %s\n", dataType, telemetry.DeviceID, *result.MessageId)
 	}
 
 	opts := mqtt.NewClientOptions().
@@ -152,6 +192,19 @@ func main() {
 	}
 	fmt.Println("Inscrito no tópico sensor/# com sucesso")
 
-	// Manter o programa rodando
-	select {}
+	// Manter o programa rodando com graceful shutdown
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	fmt.Println("Desconectando do Mosquitto...")
+	client.Disconnect(250)
+	fmt.Println("Programa encerrado")
+}
+
+// getEnv retrieves an environment variable or returns a default value if not set
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists && value != "" {
+		return value
+	}
+	return defaultValue
 }
