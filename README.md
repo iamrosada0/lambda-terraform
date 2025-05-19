@@ -6,6 +6,8 @@
 
 > Desenvolvido em Go, com infraestrutura gerenciada via **Terraform** e **Serverless Framework**, este projeto é ideal para protótipos e simulações de sistemas de frotas inteligentes.
 
+> Eu alterei o nome do projeto por isso, quando clonares altere o nome da pasta do projeto para go-lambda-localstack-test
+
 ---
 
 ## 🚀 Funcionalidades
@@ -39,7 +41,7 @@
 
 
 ```
-fleet-pulse/
+go-lambda-localstack-test/
 ├── bootstrap                # Binário da Lambda
 ├── main.go                  # Código principal em Go
 ├── build.sh                 # Script para build/deploy/testes
@@ -70,8 +72,8 @@ fleet-pulse/
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/fleet-pulse.git
-cd fleet-pulse
+git clone https://github.com/iamrosada0/lambda-terraform.git
+cd go-lambda-localstack-test
 ````
 
 ### 2. Instale as dependências
@@ -169,7 +171,7 @@ mosquitto_pub -h localhost -p 1883 -t sensor/gps -m '{"device_id":"device123","t
 Confira os logs do container responsável pelo envio à SQS para confirmar o recebimento da mensagem:
 
 ```bash
-docker logs fleet-pulse-mqtt-to-sqs-1
+docker logs go-lambda-localstack-test-mqtt-to-sqs-1
 ```
 
 ### ✅ Saída esperada
