@@ -21,22 +21,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-// TelemetryData represents the structure of incoming telemetry data
-type TelemetryData struct {
-	DeviceID  string  `json:"device_id"` // MAC address of the device
-	Timestamp string  `json:"timestamp"` // ISO 8601 timestamp
+// SQSPayload defines the structure of the SQS message payload
+type SQSPayload struct {
+	Type string `json:"type"`
+	Data Data   `json:"data"`
+}
+
+// Data defines the telemetry data structure
+type Data struct {
+	DeviceID  string  `json:"device_id"`
+	Timestamp string  `json:"timestamp"`
 	X         float64 `json:"x,omitempty"`
 	Y         float64 `json:"y,omitempty"`
 	Z         float64 `json:"z,omitempty"`
 	Latitude  float64 `json:"latitude,omitempty"`
 	Longitude float64 `json:"longitude,omitempty"`
-	Image     string  `json:"image,omitempty"` // Base64-encoded photo
-}
-
-// SQSPayload represents the SQS message structure
-type SQSPayload struct {
-	Type string        `json:"type"`
-	Data TelemetryData `json:"data"`
+	Image     string  `json:"image,omitempty"`
 }
 
 // HandleRequest processes SQS messages containing telemetry data
@@ -44,12 +44,12 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 	// Load env vars with defaults
 	region := os.Getenv("AWS_DEFAULT_REGION")
 	if region == "" {
-		region = "us-east-2"
+		region = "us-east-1" // Ajustado para us-east-1, consistente com o projeto
 	}
 
 	localstackEndpoint := os.Getenv("LOCALSTACK_ENDPOINT")
 	if localstackEndpoint == "" {
-		localstackEndpoint = "http://localhost:4566"
+		localstackEndpoint = "http://host.docker.internal:4566" // Ajustado para Windows
 	}
 
 	s3Bucket := os.Getenv("S3_BUCKET")
@@ -64,7 +64,7 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 
 	sqsQueueURL := os.Getenv("SQS_QUEUE_URL")
 	if sqsQueueURL == "" {
-		sqsQueueURL = "http://sqs.us-east-2.localhost.localstack.cloud:4566/000000000000/minha-fila"
+		sqsQueueURL = "http://localhost:4566/000000000000/minha-fila" // Ajustado para LocalStack
 	}
 
 	// Initialize AWS SDK

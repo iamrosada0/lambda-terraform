@@ -1,4 +1,4 @@
-module telemetry
+module go-lambda-localstack-test
 
 go 1.24.3
 
