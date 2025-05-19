@@ -1,49 +1,26 @@
+
 version: "3.8"
 services:
-
-  builder-processor:
-    build: .
-    volumes:
-      - ./:/src
-    working_dir: /src/cmd/processor
-    command: bash -c "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go && zip function.zip bootstrap"
-
-  builder-restapi:
-    build: .
-    volumes:
-      - ./:/src
-    working_dir: /src/cmd/restapi
-    command: bash -c "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go && zip function.zip bootstrap"
- 
   localstack:
     image: localstack/localstack:latest
     ports:
       - "4566:4566"
-      - "4510-4559:4510-4559"
-      - "9563:9563"
     environment:
-      - SERVICES=sqs,lambda,apigateway,dynamodb,rekognition,s3,iam,logs
-      - DEFAULT_REGION=us-east-2
-      - LAMBDA_EXECUTOR=docker-reuse
-      - DEBUG=1  # Enable detailed logging
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - LAMBDA_RUNTIME_ENVIRONMENT_TIMEOUT=300
-      - AWS_DEFAULT_REGION=us-east-2
-      - LOCALSTACK_ENDPOINT=http://localstack:4566
-      - S3_BUCKET=my-test-bucket
-      - DYNAMODB_TABLE=fleet-telemetry
-      - SQS_QUEUE_URL=http://localstack:4566/000000000000/minha-fila
-
-
+      - SERVICES=s3,sqs,lambda,iam,cloudwatch,dynamodb,logs,events,sts,rekognition,cloudformation
+      - AWS_DEFAULT_REGION=us-east-1
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - app-network
 
   mosquitto:
-    image: eclipse-mosquitto:2.0.18
+    image: eclipse-mosquitto:latest
     ports:
       - "1883:1883"
     volumes:
       - ./mosquitto/config:/mosquitto/config
-
-
-
+    networks:
+      - app-network
+networks:
+  app-network:
+    driver: bridge

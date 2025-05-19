@@ -1,0 +1,51 @@
+service: go-lambda-localstack-test
+frameworkVersion: '2'
+provider:
+  name: aws
+  runtime: provided.al2
+  endpointType: REGIONAL
+  region: us-east-1
+  lambdaHashingVersion: '20201221'
+  environment:
+    AWS_ENDPOINT: http://host.docker.internal:4566
+    S3_BUCKET: my-test-bucket
+    DYNAMODB_TABLE: fleet-telemetry
+    SQS_QUEUE_URL: http://localhost:4566/000000000000/minha-fila
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+      Resource: arn:aws:dynamodb:us-east-1:000000000000:table/fleet-telemetry
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+      Resource: arn:aws:s3:::my-test-bucket/*
+    - Effect: Allow
+      Action:
+        - rekognition:CompareFaces
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - sqs:DeleteMessage
+      Resource: arn:aws:sqs:us-east-1:000000000000:minha-fila
+plugins:
+  - serverless-localstack
+custom:
+  localstack:
+    debug: true
+    edgePort: 4566
+    autostart: false
+    stages:
+      - local
+    lambda:
+      mountCode: true
+functions:
+  minha-funcao:
+    handler: bootstrap
+    package:
+      include:
+        - bootstrap
+    timeout: 30
+    events:
+      - sqs:
+          arn: arn:aws:sqs:us-east-1:000000000000:minha-fila

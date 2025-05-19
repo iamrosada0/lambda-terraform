@@ -16,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition"
-	rekoTypes "github.com/aws/aws-sdk-go-v2/service/rekognition/types" // Correct import for Image
+	rekoTypes "github.com/aws/aws-sdk-go-v2/service/rekognition/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
@@ -41,9 +41,35 @@ type SQSPayload struct {
 
 // HandleRequest processes SQS messages containing telemetry data
 func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
+	// Load env vars with defaults
+	region := os.Getenv("AWS_DEFAULT_REGION")
+	if region == "" {
+		region = "us-east-2"
+	}
+
+	localstackEndpoint := os.Getenv("LOCALSTACK_ENDPOINT")
+	if localstackEndpoint == "" {
+		localstackEndpoint = "http://localhost:4566"
+	}
+
+	s3Bucket := os.Getenv("S3_BUCKET")
+	if s3Bucket == "" {
+		s3Bucket = "my-test-bucket"
+	}
+
+	dynamoTable := os.Getenv("DYNAMODB_TABLE")
+	if dynamoTable == "" {
+		dynamoTable = "fleet-telemetry"
+	}
+
+	sqsQueueURL := os.Getenv("SQS_QUEUE_URL")
+	if sqsQueueURL == "" {
+		sqsQueueURL = "http://sqs.us-east-2.localhost.localstack.cloud:4566/000000000000/minha-fila"
+	}
+
 	// Initialize AWS SDK
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(os.Getenv("AWS_DEFAULT_REGION")),
+		config.WithRegion(region),
 		config.WithCredentialsProvider(aws.AnonymousCredentials{}),
 	)
 	if err != nil {
@@ -52,16 +78,16 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 
 	// Service clients with LocalStack endpoints
 	dynamoClient := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 	sqsClient := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 	rekClient := rekognition.NewFromConfig(cfg, func(o *rekognition.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(os.Getenv("LOCALSTACK_ENDPOINT"))
+		o.BaseEndpoint = aws.String(localstackEndpoint)
 		o.UsePathStyle = true
 	})
 
@@ -119,10 +145,9 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 				fmt.Printf("Error decoding photo: %v\n", err)
 				continue
 			}
-			bucketName := os.Getenv("S3_BUCKET")
 			key := fmt.Sprintf("%s/%s.jpg", data.DeviceID, data.Timestamp)
 			_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
-				Bucket: aws.String(bucketName),
+				Bucket: aws.String(s3Bucket),
 				Key:    aws.String(key),
 				Body:   bytes.NewReader(imageBytes),
 			})
@@ -134,12 +159,12 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 			// Placeholder Rekognition call
 			resp, err := rekClient.CompareFaces(ctx, &rekognition.CompareFacesInput{
 				SourceImage:         &rekoTypes.Image{Bytes: imageBytes},
-				TargetImage:         &rekoTypes.Image{Bytes: imageBytes}, // Placeholder: replace with stored photo
+				TargetImage:         &rekoTypes.Image{Bytes: imageBytes}, // Placeholder
 				SimilarityThreshold: aws.Float32(70),
 			})
 			isRecognized := err == nil && len(resp.FaceMatches) > 0
 			item["is_recognized"], _ = attributevalue.Marshal(isRecognized)
-			item["s3_key"], _ = attributevalue.Marshal(key) // Store S3 key in DynamoDB
+			item["s3_key"], _ = attributevalue.Marshal(key)
 		default:
 			fmt.Println("Unknown data type")
 			continue
@@ -147,7 +172,7 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 
 		// Store in DynamoDB
 		_, err = dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
-			TableName: aws.String(os.Getenv("DYNAMODB_TABLE")),
+			TableName: aws.String(dynamoTable),
 			Item:      item,
 		})
 		if err != nil {
@@ -157,7 +182,7 @@ func HandleRequest(ctx context.Context, event events.SQSEvent) (string, error) {
 
 		// Delete SQS message
 		_, err = sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
-			QueueUrl:      aws.String(os.Getenv("SQS_QUEUE_URL")),
+			QueueUrl:      aws.String(sqsQueueURL),
 			ReceiptHandle: aws.String(record.ReceiptHandle),
 		})
 		if err != nil {

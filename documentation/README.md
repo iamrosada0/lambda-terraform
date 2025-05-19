@@ -163,6 +163,10 @@ aws --endpoint-url=http://localhost:4566 --region us-east-2 sqs send-message --q
 # Acompanhar os logs da função Lambda (último 1 minuto, modo follow)
 aws --endpoint-url=http://localhost:4566 logs tail /aws/lambda/minha-funcao --since 1m --follow
 
+# Para fazer scan na tabela
+
+aws --endpoint-url=http://localhost:4566 dynamodb scan --table-name Mensagens --region us-east-1
+
 # Permitir variáveis do direnv (caso esteja usando)
 direnv allow
 ```
