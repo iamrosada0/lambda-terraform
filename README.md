@@ -38,7 +38,7 @@
 ## 📁 Estrutura do Projeto
 
 
-
+```
 fleet-pulse/
 ├── bootstrap                # Binário da Lambda
 ├── main.go                  # Código principal em Go
@@ -48,7 +48,7 @@ fleet-pulse/
 ├── docker-compose.yml       # LocalStack + Mosquitto
 ├── mosquitto.conf           # Configuração MQTT
 ├── go.mod / go.sum          # Módulos Go
-
+```
 
 
 ---
