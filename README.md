@@ -1,5 +1,5 @@
 
-```markdown
+
 # FleetPulse
 
 **FleetPulse** é um sistema de telemetria para dispositivos IoT (como rastreadores veiculares), que processa dados de sensores como GPS, giroscópio e imagens. Ele utiliza serviços da AWS simulados com **LocalStack**, permitindo desenvolvimento e testes locais com serviços como **Lambda**, **SQS**, **S3**, **DynamoDB**, **Rekognition** e **Mosquitto** para MQTT.
@@ -37,7 +37,7 @@
 
 ## 📁 Estrutura do Projeto
 
-```
+
 
 fleet-pulse/
 ├── bootstrap                # Binário da Lambda
@@ -49,7 +49,7 @@ fleet-pulse/
 ├── mosquitto.conf           # Configuração MQTT
 ├── go.mod / go.sum          # Módulos Go
 
-````
+
 
 ---
 
