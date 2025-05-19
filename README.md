@@ -191,7 +191,6 @@ provider "aws" {
 
 ## 🧭 Próximos Passos
 
-* [ ] Conectar MQTT → Lambda via bridge com SQS
 * [ ] Adicionar filtros e índices no DynamoDB
 * [ ] Migrar runtime para `provided.al2023`
 * [ ] Adicionar testes unitários e mocks de Rekognition
