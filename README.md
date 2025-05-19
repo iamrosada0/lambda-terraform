@@ -150,11 +150,36 @@ aws --endpoint-url=http://localhost:4566 s3 ls s3://my-test-bucket
 
 ---
 
-## 📡 Testes MQTT 
+## 📡 Testando o MQTT
+
+Para testar o fluxo de publicação MQTT e envio para a SQS, siga os passos abaixo:
+
+### 🔹 Publicar uma mensagem no tópico `sensor/gps`
+
+Execute o seguinte comando para simular uma mensagem de GPS:
 
 ```bash
-# Publica
 mosquitto_pub -h localhost -p 1883 -t sensor/gps -m '{"device_id":"device123","timestamp":"2025-05-19T17:00:00Z","latitude":40.7128,"longitude":-74.0060}'
+```
+
+### 🔹 Verificar os logs do cliente MQTT
+
+Confira os logs do container responsável pelo envio à SQS para confirmar o recebimento da mensagem:
+
+```bash
+docker logs fleet-pulse-mqtt-to-sqs-1
+```
+
+### ✅ Saída esperada
+
+```
+Recebida mensagem no tópico sensor/gps: {"device_id":"device123","timestamp":"2025-05-19T17:00:00Z","latitude":40.7128,"longitude":-74.0060}
+Enviando para SQS: {"type":"gps","data":{"device_id":"device123","timestamp":"2025-05-19T17:00:00Z","latitude":40.7128,"longitude":-74.0060}}
+Mensagem gps do dispositivo device123 enviada para SQS com MessageId: <message-id>
+```
+
+---
+
 # Assina
 mosquitto_sub -h localhost -p 1883 -t test/topic
 ```
@@ -166,7 +191,7 @@ mosquitto_sub -h localhost -p 1883 -t test/topic
 * O Serverless cria automaticamente o **Event Source Mapping** entre SQS e a Lambda.
   Verifique com:
 
-```bash
+```
 aws --endpoint-url=http://localhost:4566 lambda list-event-source-mappings
 ```
 
