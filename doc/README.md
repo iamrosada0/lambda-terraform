@@ -1,4 +1,3 @@
-Claro! Vou transformar os comandos que você executou em um README explicando o que cada um faz no contexto do AWS Lambda e SQS usando LocalStack e AWS CLI.
 
 ---
 
