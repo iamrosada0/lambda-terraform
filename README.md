@@ -150,12 +150,11 @@ aws --endpoint-url=http://localhost:4566 s3 ls s3://my-test-bucket
 
 ---
 
-## 📡 Testes MQTT (opcional)
+## 📡 Testes MQTT 
 
 ```bash
 # Publica
-mosquitto_pub -h localhost -p 1883 -t test/topic -m "Mensagem MQTT"
-
+mosquitto_pub -h localhost -p 1883 -t sensor/gps -m '{"device_id":"device123","timestamp":"2025-05-19T17:00:00Z","latitude":40.7128,"longitude":-74.0060}'
 # Assina
 mosquitto_sub -h localhost -p 1883 -t test/topic
 ```
