@@ -32,3 +32,25 @@ vendor/
 
 # Outros
 node_modules/
+
+
+# Ignorar arquivos .zip
+*.zip
+
+# Ignorar binários do Go
+# Para Linux/macOS
+*.out
+*.exe
+*.bin
+
+# Para Windows (Go compila como .exe)
+*.exe
+
+# Ignorar pastas de build ou output se você tiver uma
+/build/
+/dist/
+/bin/
+
+/# Ignorar arquivos temporários
+*.tmp
+*.log
